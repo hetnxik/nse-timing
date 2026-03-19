@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(python3:*)",
+      "Bash(open \"/Applications/Python 3.13/Install Certificates.command\")",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

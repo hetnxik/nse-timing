@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100;
+  }
+
+  button {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-4;
+  }
+
+  .stat-card {
+    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-4 text-center;
+  }
+
+  .signal-card {
+    @apply flex items-start gap-3 p-3 rounded border;
+  }
+
+  .indicator-value {
+    @apply text-2xl font-mono font-bold;
+  }
+}
