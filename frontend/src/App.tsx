@@ -4,6 +4,7 @@ import { Analyser } from "./pages/Analyser";
 import { Screener } from "./pages/Screener";
 import { Compare } from "./pages/Compare";
 import { Heatmap } from "./pages/Heatmap";
+import { Education } from "./pages/Education";
 
 export function App() {
   const [dark, setDark] = useState(() => {
@@ -51,6 +52,12 @@ export function App() {
                 >
                   Heatmap
                 </Link>
+                <Link
+                  to="/education"
+                  className="text-sm hover:text-blue-600 transition-colors"
+                >
+                  Education
+                </Link>
               </div>
             </div>
             <button
@@ -69,6 +76,7 @@ export function App() {
             <Route path="/screener" element={<Screener />} />
             <Route path="/compare" element={<Compare />} />
             <Route path="/heatmap" element={<Heatmap />} />
+            <Route path="/education" element={<Education />} />
           </Routes>
         </main>
       </div>

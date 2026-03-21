@@ -357,6 +357,50 @@ def calculate_composite_score(indicators: dict) -> tuple:
     return score, verdict
 
 
+def compute_score_history(df: pd.DataFrame) -> list:
+    """Compute composite score for every trading day with enough history (skip first 200 rows)."""
+    close = df['Close']
+    rsi_series = calculate_rsi(close, 14)
+    _macd_line, _signal_line, histogram = calculate_macd(close)
+    _upper, _mid, _lower, pct_b = calculate_bollinger_bands(close, 20, 2)
+    ma200_series = close.rolling(window=200).mean()
+    vol_ma20 = df['Volume'].rolling(window=20).mean()
+
+    result = []
+    for i in range(200, len(df)):
+        date_str = df.index[i].strftime("%Y-%m-%d")
+        cp = float(close.iloc[i])
+
+        rsi_val = rsi_series.iloc[i]
+        macd_hist = histogram.iloc[i]
+        pct_b_val = pct_b.iloc[i]
+        ma200_val = ma200_series.iloc[i]
+        vol_val = df['Volume'].iloc[i]
+        vol_avg = vol_ma20.iloc[i]
+
+        if any(pd.isna(v) for v in [rsi_val, macd_hist, pct_b_val, ma200_val, vol_avg]):
+            continue
+
+        # 6M momentum — use 126 bars back if available
+        mom_6m = ((cp - float(close.iloc[i - 126])) / float(close.iloc[i - 126])) * 100 if i >= 126 else 0
+
+        bull_regime = cp > float(ma200_val)
+        volume_ratio = float(vol_val) / float(vol_avg) if vol_avg > 0 else 1.0
+
+        indicators_snap = {
+            "rsi": float(rsi_val),
+            "macd": {"histogram": float(macd_hist)},
+            "bollinger_bands": {"pct_b": float(pct_b_val)},
+            "momentum_6m": float(mom_6m),
+            "ma200": {"bull_regime": bull_regime},
+            "volume_ratio": float(volume_ratio),
+        }
+        score, _ = calculate_composite_score(indicators_snap)
+        result.append({"date": date_str, "close": round(cp, 2), "score": float(score)})
+
+    return result
+
+
 def calculate_support_resistance(df: pd.DataFrame, window: int = 10, n_levels: int = 3) -> dict:
     """Detect support and resistance levels using pivot point clustering."""
     highs = df['High']
@@ -482,6 +526,96 @@ async def get_stock(ticker: str):
     fundamentals = fetch_fundamentals(ticker)
     support_resistance = calculate_support_resistance(df)
 
+    # --- Entry Zone ---
+    atr_val = indicators["atr"]["value"]
+    bb_upper_val = indicators["bollinger_bands"]["upper"]
+    bb_lower_val = indicators["bollinger_bands"]["lower"]
+    high_52w_entry = float(df['High'].iloc[-252:].max() if len(df) >= 252 else df['High'].max())
+
+    ideal_entry_low = round(bb_lower_val, 2)
+    ideal_entry_high = round(float(current_price), 2)
+
+    stop_atr = round(float(current_price) - 2 * atr_val, 2)
+    stop_bb = round(bb_lower_val - 0.5 * atr_val, 2)
+
+    stop_atr_pct = round(((float(current_price) - stop_atr) / float(current_price)) * 100, 2)
+    stop_bb_pct = round(((float(current_price) - stop_bb) / float(current_price)) * 100, 2)
+
+    target_bb_upper = round(bb_upper_val, 2)
+    target_52w_high = round(high_52w_entry, 2)
+
+    # Momentum target: avg 6M momentum of last 3 signals from score_history
+    score_hist = compute_score_history(df)
+    last_signals = [h for h in score_hist if h["score"] >= 65][-3:]
+    if last_signals:
+        moms = []
+        for s in last_signals:
+            try:
+                sig_date = pd.to_datetime(s["date"])
+                pos = df.index.get_loc(sig_date) if sig_date in df.index else None
+                if pos is None:
+                    # find nearest
+                    pos_arr = df.index.searchsorted(sig_date)
+                    pos = min(int(pos_arr), len(df) - 1)
+                fwd = min(pos + 126, len(df) - 1)
+                m = ((float(df['Close'].iloc[fwd]) - s["close"]) / s["close"]) * 100
+                moms.append(m)
+            except Exception:
+                pass
+        avg_mom = float(np.mean(moms)) if moms else 15.0
+    else:
+        avg_mom = 15.0
+    target_momentum = round(float(current_price) * (1 + avg_mom / 100), 2)
+
+    def pct_move(target: float, entry: float) -> float:
+        return round(((target - entry) / entry) * 100, 2) if entry > 0 else 0.0
+
+    def rr_ratio(target: float, entry: float, stop: float) -> float:
+        denom = entry - stop
+        if denom <= 0:
+            return 0.0
+        return round((target - entry) / denom, 2)
+
+    def rr_quality(rr: float) -> str:
+        if rr < 1.5:
+            return "poor"
+        elif rr <= 2.5:
+            return "acceptable"
+        return "good"
+
+    def position_size(stop_pct: float) -> float:
+        if stop_pct <= 0:
+            return 0.0
+        return round(min(1.0 / stop_pct * 100, 20.0), 2)
+
+    entry_zone = {
+        "ideal_entry_low": ideal_entry_low,
+        "ideal_entry_high": ideal_entry_high,
+        "entry_note": f"Ideal entry between the lower Bollinger Band (₹{ideal_entry_low}) and current price (₹{ideal_entry_high}). The lower band represents a statistically oversold level.",
+        "stop_atr": stop_atr,
+        "stop_atr_pct": stop_atr_pct,
+        "stop_atr_label": "ATR-based stop",
+        "stop_bb": stop_bb,
+        "stop_bb_pct": stop_bb_pct,
+        "stop_bb_label": "BB-based stop",
+        "target_bb_upper": target_bb_upper,
+        "target_bb_upper_pct": pct_move(target_bb_upper, float(current_price)),
+        "target_52w_high": target_52w_high,
+        "target_52w_high_pct": pct_move(target_52w_high, float(current_price)),
+        "target_momentum": target_momentum,
+        "target_momentum_pct": round(avg_mom, 2),
+        "rr_matrix": {
+            "atr_bb_upper": {"rr": rr_ratio(target_bb_upper, float(current_price), stop_atr), "quality": rr_quality(rr_ratio(target_bb_upper, float(current_price), stop_atr))},
+            "atr_52w_high": {"rr": rr_ratio(target_52w_high, float(current_price), stop_atr), "quality": rr_quality(rr_ratio(target_52w_high, float(current_price), stop_atr))},
+            "atr_momentum": {"rr": rr_ratio(target_momentum, float(current_price), stop_atr), "quality": rr_quality(rr_ratio(target_momentum, float(current_price), stop_atr))},
+            "bb_bb_upper": {"rr": rr_ratio(target_bb_upper, float(current_price), stop_bb), "quality": rr_quality(rr_ratio(target_bb_upper, float(current_price), stop_bb))},
+            "bb_52w_high": {"rr": rr_ratio(target_52w_high, float(current_price), stop_bb), "quality": rr_quality(rr_ratio(target_52w_high, float(current_price), stop_bb))},
+            "bb_momentum": {"rr": rr_ratio(target_momentum, float(current_price), stop_bb), "quality": rr_quality(rr_ratio(target_momentum, float(current_price), stop_bb))},
+        },
+        "position_size_atr": position_size(stop_atr_pct),
+        "position_size_bb": position_size(stop_bb_pct),
+    }
+
     response = {
         "meta": {
             "ticker": ticker,
@@ -502,6 +636,8 @@ async def get_stock(ticker: str):
         "chart_data": chart_data,
         "fundamentals": fundamentals,
         "support_resistance": support_resistance,
+        "entry_zone": entry_zone,
+        "score_history": score_hist,
     }
 
     set_cache(ticker, response)
@@ -633,6 +769,108 @@ async def get_heatmap():
         })
 
     return heatmap
+
+
+@app.get("/api/backtest/{ticker}")
+async def get_backtest(ticker: str):
+    """Run historical backtesting using 2 years of daily data."""
+    ticker = ticker.upper()
+    cache_key = f"backtest_{ticker}"
+    cached = get_cached(cache_key)
+    if cached:
+        return cached
+
+    df, _ = fetch_stock_data(ticker)
+    score_hist = compute_score_history(df)
+
+    close = df['Close']
+    rsi_series = calculate_rsi(close, 14)
+    ma200_series = close.rolling(window=200).mean()
+
+    # Build date -> df integer index map for fast lookup
+    df_date_to_idx = {dt.strftime("%Y-%m-%d"): i for i, dt in enumerate(df.index)}
+
+    signals = []
+    last_signal_idx = -999  # track index of last signal
+
+    for i, h in enumerate(score_hist):
+        if i == 0:
+            continue
+        prev = score_hist[i - 1]
+        date_str = h["date"]
+        score_val = h["score"]
+        prev_score = prev["score"]
+
+        df_idx = df_date_to_idx.get(date_str)
+        if df_idx is None:
+            continue
+
+        # Cooldown: no signal within 63 trading days of last
+        if i - last_signal_idx < 63:
+            continue
+
+        rsi_val = rsi_series.iloc[df_idx] if df_idx < len(rsi_series) else float('nan')
+        ma200_val = ma200_series.iloc[df_idx] if df_idx < len(ma200_series) else float('nan')
+        cp = h["close"]
+
+        is_strong = score_val >= 65 and prev_score < 65
+        is_moderate = (score_val >= 55 and prev_score < 55 and
+                       not pd.isna(rsi_val) and rsi_val < 40 and
+                       not pd.isna(ma200_val) and cp > float(ma200_val))
+
+        if not (is_strong or is_moderate):
+            continue
+
+        last_signal_idx = i
+        signal_type = "strong" if is_strong else "moderate"
+
+        # Look ahead 63 and 126 trading days
+        future_63 = score_hist[i + 63]["close"] if i + 63 < len(score_hist) else None
+        future_126 = score_hist[i + 126]["close"] if i + 126 < len(score_hist) else None
+
+        ret_3m = round(((future_63 - cp) / cp) * 100, 2) if future_63 is not None else None
+        ret_6m = round(((future_126 - cp) / cp) * 100, 2) if future_126 is not None else None
+
+        # Max drawdown and stop hit in 126-day window
+        end_idx = min(i + 126, len(score_hist) - 1)
+        window_prices = [score_hist[j]["close"] for j in range(i, end_idx + 1)]
+        atr_at_signal = float(calculate_atr(df, 14).iloc[df_idx]) if df_idx < len(df) else 0
+        stop_atr_price = cp - 2 * atr_at_signal
+        hit_stop = any(p < stop_atr_price for p in window_prices)
+        max_dd = round(((min(window_prices) - cp) / cp) * 100, 2)
+
+        signals.append({
+            "signal_date": date_str,
+            "signal_price": round(cp, 2),
+            "signal_score": round(score_val, 1),
+            "signal_type": signal_type,
+            "outcome_price_63d": round(future_63, 2) if future_63 else None,
+            "outcome_price_126d": round(future_126, 2) if future_126 else None,
+            "return_3m": ret_3m,
+            "return_6m": ret_6m,
+            "hit_stop_atr": hit_stop,
+            "max_drawdown_pct": max_dd,
+        })
+
+    completed = [s for s in signals if s["return_6m"] is not None]
+    wins = [s for s in completed if s["return_6m"] > 0]
+    returns_6m = [s["return_6m"] for s in completed]
+    drawdowns = [s["max_drawdown_pct"] for s in signals]
+
+    agg = {
+        "total_signals": len(signals),
+        "signals_with_6m_outcome": len(completed),
+        "win_rate_6m": round(len(wins) / len(completed) * 100, 1) if completed else None,
+        "avg_return_6m": round(float(np.mean(returns_6m)), 2) if returns_6m else None,
+        "median_return_6m": round(float(np.median(returns_6m)), 2) if returns_6m else None,
+        "avg_max_drawdown": round(float(np.mean(drawdowns)), 2) if drawdowns else None,
+        "best_signal": max(completed, key=lambda s: s["return_6m"]) if completed else None,
+        "worst_signal": min(completed, key=lambda s: s["return_6m"]) if completed else None,
+    }
+
+    result = {"ticker": ticker, "signals": signals, "stats": agg, "score_history": score_hist}
+    set_cache(cache_key, result)
+    return result
 
 
 @app.get("/api/health")

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { apiClient } from "../api";
 import { getVerdictColor } from "../explanations";
+import { exportCsv } from "../utils/exportCsv";
 
 
 export const Screener = () => {
@@ -149,6 +150,23 @@ export const Screener = () => {
         </div>
       ) : screenerResults.length > 0 ? (
         <div className="card overflow-x-auto">
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => exportCsv("screener_results.csv", screenerResults.map((s) => ({
+                Symbol: s.symbol,
+                Score: s.score.toFixed(0),
+                Verdict: s.verdict,
+                Price: s.price.toFixed(2),
+                RSI: s.rsi.toFixed(1),
+                "6M Momentum %": s.momentum_6m.toFixed(2),
+                Regime: s.regime,
+                "Above 200-DMA": s.indicators.ma200.bull_regime ? "Yes" : "No",
+              })))}
+              className="px-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              Export CSV
+            </button>
+          </div>
           <table className="w-full">
             <thead className="border-b border-slate-200 dark:border-slate-700">
               <tr className="text-sm font-semibold text-slate-600 dark:text-slate-400">

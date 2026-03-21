@@ -174,6 +174,39 @@ export const macdChartExplanation = `MACD (blue) crossing above the signal line 
 
 export const bbChartExplanation = `Bollinger Bands show the price range (upper/lower gray bands) and 20-day average (middle line). Price bounces between bands; extremes (near upper/lower) often reverse. When price holds above the middle band, the trend is up. Wide bands = volatility; narrow = consolidation.`;
 
+// Score history chart explanation
+export const scoreHistoryChartExplanation = `The purple area shows how the composite statistical score has evolved over 2 years. Periods where the score rose above 65 (green dashed line) represent historically attractive entry windows — compare these to the price line to see how much upside followed.`;
+
+// Entry zone interpretation template
+export const getEntryZoneExplanation = (
+  stopBasis: "atr" | "bb",
+  stop: number,
+  stopPct: number,
+  _targetBasis: "bb_upper" | "52w_high" | "momentum",
+  target: number,
+  targetLabel: string,
+  rr: number,
+  posPct: number
+): string => {
+  const stopLabel = stopBasis === "atr" ? "ATR-based stop" : "BB-based stop";
+  return `Based on the ${stopLabel} at ₹${stop.toFixed(2)} (${stopPct.toFixed(1)}% below entry) and the ${targetLabel} target at ₹${target.toFixed(2)}, this setup offers a ${rr.toFixed(2)}:1 risk/reward ratio. At 1% portfolio risk, you should size this position at ${posPct.toFixed(1)}% of your portfolio.`;
+};
+
+// Backtest interpretation template
+export const getBacktestExplanation = (
+  symbol: string,
+  n: number,
+  completed: number,
+  winRate: number | null,
+  avgReturn: number | null,
+  avgDd: number | null
+): string => {
+  const wr = winRate !== null ? `${winRate.toFixed(1)}%` : "N/A";
+  const ar = avgReturn !== null ? `${avgReturn.toFixed(1)}%` : "N/A";
+  const dd = avgDd !== null ? `${Math.abs(avgDd).toFixed(1)}%` : "N/A";
+  return `Over the past 2 years, this score model generated ${n} signal${n !== 1 ? "s" : ""} on ${symbol}. Of the ${completed} with a full 6-month outcome, ${wr} were profitable with an average return of ${ar}. The average drawdown during the holding period was ${dd}, which gives you a sense of the patience required.`;
+};
+
 // Indicator card templates
 export const getIndicatorExplanation = (
   indicator: string,

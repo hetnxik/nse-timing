@@ -77,6 +77,56 @@ export interface StockData {
     support: number[];
     resistance: number[];
   };
+  entry_zone: {
+    ideal_entry_low: number;
+    ideal_entry_high: number;
+    entry_note: string;
+    stop_atr: number;
+    stop_atr_pct: number;
+    stop_atr_label: string;
+    stop_bb: number;
+    stop_bb_pct: number;
+    stop_bb_label: string;
+    target_bb_upper: number;
+    target_bb_upper_pct: number;
+    target_52w_high: number;
+    target_52w_high_pct: number;
+    target_momentum: number;
+    target_momentum_pct: number;
+    rr_matrix: Record<string, { rr: number; quality: "poor" | "acceptable" | "good" }>;
+    position_size_atr: number;
+    position_size_bb: number;
+  };
+  score_history: Array<{ date: string; close: number; score: number }>;
+}
+
+export interface BacktestSignal {
+  signal_date: string;
+  signal_price: number;
+  signal_score: number;
+  signal_type: "strong" | "moderate";
+  outcome_price_63d: number | null;
+  outcome_price_126d: number | null;
+  return_3m: number | null;
+  return_6m: number | null;
+  hit_stop_atr: boolean;
+  max_drawdown_pct: number;
+}
+
+export interface BacktestResult {
+  ticker: string;
+  signals: BacktestSignal[];
+  stats: {
+    total_signals: number;
+    signals_with_6m_outcome: number;
+    win_rate_6m: number | null;
+    avg_return_6m: number | null;
+    median_return_6m: number | null;
+    avg_max_drawdown: number | null;
+    best_signal: BacktestSignal | null;
+    worst_signal: BacktestSignal | null;
+  };
+  score_history: Array<{ date: string; close: number; score: number }>;
 }
 
 export interface CompareStock {
@@ -146,6 +196,11 @@ export const apiClient = {
 
   async getHeatmap(): Promise<HeatmapResult[]> {
     const { data } = await axios.get(`${API_BASE}/api/heatmap`);
+    return data;
+  },
+
+  async getBacktest(ticker: string): Promise<BacktestResult> {
+    const { data } = await axios.get(`${API_BASE}/api/backtest/${ticker}`);
     return data;
   },
 };
