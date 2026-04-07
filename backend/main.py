@@ -1,3 +1,4 @@
+import math
 import pandas as pd
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -67,6 +68,17 @@ def get_cached(ticker: str):
 def set_cache(ticker: str, data):
     """Set cache with timestamp."""
     cache[ticker] = {"data": data, "timestamp": time.time()}
+
+
+def sanitize_floats(obj):
+    """Recursively replace nan/inf float values with None for JSON compliance."""
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: sanitize_floats(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_floats(v) for v in obj]
+    return obj
 
 
 def generate_mock_data(ticker: str) -> pd.DataFrame:
@@ -640,6 +652,7 @@ async def get_stock(ticker: str):
         "score_history": score_hist,
     }
 
+    response = sanitize_floats(response)
     set_cache(ticker, response)
     return response
 
