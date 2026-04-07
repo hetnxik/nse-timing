@@ -629,12 +629,12 @@ export const Analyser = () => {
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Price</div>
-                <div className="text-lg font-bold font-mono">₹{currentStock.meta.current_price.toFixed(2)}</div>
+                <div className="text-lg font-bold font-mono">{currentStock.meta.current_price != null ? `₹${currentStock.meta.current_price.toFixed(2)}` : "—"}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Day Change</div>
-                <div className={`text-lg font-bold font-mono ${currentStock.meta.day_change_pct >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {currentStock.meta.day_change_pct > 0 ? "+" : ""}{currentStock.meta.day_change_pct.toFixed(2)}%
+                <div className={`text-lg font-bold font-mono ${(currentStock.meta.day_change_pct ?? 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {currentStock.meta.day_change_pct != null ? `${currentStock.meta.day_change_pct > 0 ? "+" : ""}${currentStock.meta.day_change_pct.toFixed(2)}%` : "—"}
                 </div>
               </div>
             </div>
@@ -680,21 +680,23 @@ export const Analyser = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="stat-card">
                   <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">52W High</div>
-                  <div className="text-2xl font-mono font-bold">₹{currentStock.meta.high_52w.toFixed(2)}</div>
+                  <div className="text-2xl font-mono font-bold">{currentStock.meta.high_52w != null ? `₹${currentStock.meta.high_52w.toFixed(2)}` : "—"}</div>
                 </div>
                 <div className="stat-card">
                   <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">52W Low</div>
-                  <div className="text-2xl font-mono font-bold">₹{currentStock.meta.low_52w.toFixed(2)}</div>
+                  <div className="text-2xl font-mono font-bold">{currentStock.meta.low_52w != null ? `₹${currentStock.meta.low_52w.toFixed(2)}` : "—"}</div>
                 </div>
                 <div className="stat-card">
                   <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">From 52W High</div>
                   <div className="text-2xl font-mono font-bold text-red-600 dark:text-red-400">
-                    -{(((currentStock.meta.high_52w - currentStock.meta.current_price) / currentStock.meta.high_52w) * 100).toFixed(1)}%
+                    {currentStock.meta.high_52w != null && currentStock.meta.current_price != null
+                      ? `-${(((currentStock.meta.high_52w - currentStock.meta.current_price) / currentStock.meta.high_52w) * 100).toFixed(1)}%`
+                      : "—"}
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">ATR %</div>
-                  <div className="text-2xl font-mono font-bold">{currentStock.indicators.atr.pct.toFixed(2)}%</div>
+                  <div className="text-2xl font-mono font-bold">{currentStock.indicators.atr.pct != null ? `${currentStock.indicators.atr.pct.toFixed(2)}%` : "—"}</div>
                 </div>
               </div>
 

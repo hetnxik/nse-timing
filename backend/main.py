@@ -116,7 +116,12 @@ def fetch_stock_data(ticker: str) -> tuple:
             return generate_mock_data(ticker), False
 
         df = df[['Open', 'High', 'Low', 'Close', 'Volume']].astype(float)
+        df = df.dropna(subset=['Close'])
         df.index = pd.to_datetime(df.index).tz_localize(None)
+
+        if df.empty:
+            print(f"⚠️  All rows NaN for {ticker}. Using mock data.")
+            return generate_mock_data(ticker), False
 
         print(f"✓ Fetched {len(df)} rows for {ticker} from yfinance (LIVE DATA)")
         return df, True
