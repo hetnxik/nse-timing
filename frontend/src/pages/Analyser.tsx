@@ -32,6 +32,7 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Bar,
+  Cell,
   ReferenceLine,
   Area,
 } from "recharts";
@@ -265,15 +266,6 @@ function EntryZoneTab({ stock }: { stock: StockData }) {
 
 // ── Backtest Tab ──────────────────────────────────────────────────────────────
 
-// Custom dot for signal markers on price line
-function SignalDot(props: {
-  cx?: number; cy?: number; payload?: { signal?: "strong" | "moderate" };
-}) {
-  const { cx, cy, payload } = props;
-  if (!payload?.signal || !cx || !cy) return null;
-  const fill = payload.signal === "strong" ? "#16a34a" : "#f59e0b";
-  return <circle cx={cx} cy={cy} r={5} fill={fill} stroke="#fff" strokeWidth={1.5} />;
-}
 
 function BacktestTab({ ticker }: { ticker: string }) {
   const [data, setData] = useState<BacktestResult | null>(null);
@@ -336,15 +328,29 @@ function BacktestTab({ ticker }: { ticker: string }) {
       </div>
 
       {/* Main Chart */}
-      <div className="card space-y-3">
-        <h3 className="font-bold text-lg">Price & Score with Signals</h3>
-        <div className="h-72">
+      <div className="card space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg">Price & Score with Signals</h3>
+          <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-4 border-t-2 border-blue-600"></span> Price
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-0.5 h-3 bg-green-700"></span> Strong signal
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-0.5 h-3 bg-amber-500"></span> Moderate signal
+            </span>
+          </div>
+        </div>
+
+        {/* Price panel */}
+        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }} />
-              <YAxis yAxisId="price" orientation="left" fontSize={11} />
-              <YAxis yAxisId="score" orientation="right" domain={[0, 100]} fontSize={11} />
+            <ComposedChart data={chartData} syncId="backtest" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" hide />
+              <YAxis fontSize={11} tick={{ fill: "#94a3b8" }} tickFormatter={(v) => `₹${v.toFixed(0)}`} width={70} />
               <Tooltip
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
@@ -354,12 +360,14 @@ function BacktestTab({ ticker }: { ticker: string }) {
                     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 text-xs shadow">
                       <div className="font-semibold">{d.date}</div>
                       <div>Price: ₹{d.close?.toFixed(2)}</div>
-                      <div>Score: {d.score?.toFixed(1)}</div>
                       {sig && (
                         <>
-                          <div className="mt-1 font-semibold text-blue-600">Signal: {sig.signal_type}</div>
-                          <div>3M: {sig.return_3m !== null ? `${sig.return_3m}%` : "—"}</div>
-                          <div>6M: {sig.return_6m !== null ? `${sig.return_6m}%` : "—"}</div>
+                          <div className="mt-1 font-semibold" style={{ color: sig.signal_type === "strong" ? "#16a34a" : "#f59e0b" }}>
+                            Signal: {sig.signal_type}
+                          </div>
+                          <div>Entry: ₹{sig.signal_price.toFixed(2)}</div>
+                          <div>3M: {sig.return_3m !== null ? `${sig.return_3m > 0 ? "+" : ""}${sig.return_3m}%` : "—"}</div>
+                          <div>6M: {sig.return_6m !== null ? `${sig.return_6m > 0 ? "+" : ""}${sig.return_6m}%` : "—"}</div>
                           <div>Max DD: {sig.max_drawdown_pct}%</div>
                         </>
                       )}
@@ -367,27 +375,47 @@ function BacktestTab({ ticker }: { ticker: string }) {
                   );
                 }}
               />
-              <Legend />
-              <Line
-                yAxisId="price"
-                type="monotone"
-                dataKey="close"
-                stroke="#2563eb"
-                name="Price"
-                dot={(props) => <SignalDot {...props} />}
-                strokeWidth={2}
+              {signals.map((s) => (
+                <ReferenceLine
+                  key={s.signal_date}
+                  x={s.signal_date}
+                  stroke={s.signal_type === "strong" ? "#16a34a" : "#f59e0b"}
+                  strokeWidth={2}
+                  strokeOpacity={0.8}
+                  label={{ value: s.signal_type === "strong" ? "▲" : "△", position: "top", fontSize: 10, fill: s.signal_type === "strong" ? "#16a34a" : "#f59e0b" }}
+                />
+              ))}
+              <Line type="monotone" dataKey="close" stroke="#2563eb" name="Price" dot={false} strokeWidth={2} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Score panel */}
+        <div className="h-28">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} syncId="backtest" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
+                tickFormatter={(d) => d.slice(0, 7)}
+                interval={Math.max(Math.floor(chartData.length / 8) - 1, 0)} />
+              <YAxis domain={[0, 100]} fontSize={11} tick={{ fill: "#94a3b8" }} width={70} ticks={[0, 35, 65, 100]} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 text-xs shadow">
+                      <div className="font-semibold">{d.date}</div>
+                      <div>Score: {d.score?.toFixed(1)}</div>
+                    </div>
+                  );
+                }}
               />
-              <Line
-                yAxisId="score"
-                type="monotone"
-                dataKey="score"
-                stroke="#8b5cf6"
-                name="Score"
-                dot={false}
-                strokeWidth={1.5}
-              />
-              <ReferenceLine yAxisId="score" y={65} stroke="#16a34a" strokeDasharray="5 5"
-                label={{ value: "65", fontSize: 10, fill: "#16a34a", position: "right" }} />
+              <ReferenceLine y={65} stroke="#16a34a" strokeDasharray="5 5"
+                label={{ value: "Buy (65)", fontSize: 9, fill: "#16a34a", position: "insideTopRight" }} />
+              <ReferenceLine y={35} stroke="#ef4444" strokeDasharray="5 5"
+                label={{ value: "Avoid (35)", fontSize: 9, fill: "#ef4444", position: "insideBottomRight" }} />
+              <Area type="monotone" dataKey="score" stroke="#8b5cf6" fill="#8b5cf633" name="Score" dot={false} strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -735,18 +763,22 @@ export const Analyser = () => {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={ma200Data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
+                        tickFormatter={(d) => d.slice(0, 7)}
+                        interval={Math.max(Math.floor(ma200Data.length / 8) - 1, 0)} />
+                      <YAxis fontSize={11} tick={{ fill: "#94a3b8" }} tickFormatter={(v) => `₹${v.toFixed(0)}`} width={70} />
                       <Tooltip formatter={(val) => `₹${(val as number).toFixed(2)}`} />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Line type="monotone" dataKey="price" stroke="#2563eb" name="Price" dot={false} strokeWidth={2} />
                       <Line type="monotone" dataKey="ma200" stroke="#f59e0b" name="200-DMA" dot={false} strokeWidth={2} strokeDasharray="5 5" />
                       {currentStock.support_resistance.support.map((v) => (
-                        <ReferenceLine key={`s${v}`} y={v} stroke="#16a34a" strokeDasharray="4 2" strokeWidth={1} />
+                        <ReferenceLine key={`s${v}`} y={v} stroke="#16a34a" strokeDasharray="4 2" strokeWidth={1}
+                          label={{ value: `S ₹${v.toFixed(0)}`, fontSize: 9, fill: "#16a34a", position: "insideTopRight" }} />
                       ))}
                       {currentStock.support_resistance.resistance.map((v) => (
-                        <ReferenceLine key={`r${v}`} y={v} stroke="#dc2626" strokeDasharray="4 2" strokeWidth={1} />
+                        <ReferenceLine key={`r${v}`} y={v} stroke="#dc2626" strokeDasharray="4 2" strokeWidth={1}
+                          label={{ value: `R ₹${v.toFixed(0)}`, fontSize: 9, fill: "#dc2626", position: "insideBottomRight" }} />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
@@ -760,14 +792,16 @@ export const Analyser = () => {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={currentStock.chart_data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} domain={[0, 100]} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
+                        tickFormatter={(d) => d.slice(0, 7)}
+                        interval={Math.max(Math.floor(currentStock.chart_data.length / 8) - 1, 0)} />
+                      <YAxis fontSize={11} tick={{ fill: "#94a3b8" }} domain={[0, 100]} />
                       <Tooltip />
-                      <Legend />
-                      <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "70", fontSize: 10, fill: "#ef4444" }} />
-                      <ReferenceLine y={30} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: "30", fontSize: 10, fill: "#f59e0b" }} />
-                      <Line type="monotone" dataKey="rsi" stroke="#8b5cf6" name="RSI" dot={false} strokeWidth={2} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Overbought (70)", fontSize: 10, fill: "#ef4444", position: "insideTopRight" }} />
+                      <ReferenceLine y={30} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: "Oversold (30)", fontSize: 10, fill: "#f59e0b", position: "insideBottomRight" }} />
+                      <Line type="monotone" dataKey="rsi" stroke="#8b5cf6" name="RSI (14)" dot={false} strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -780,14 +814,20 @@ export const Analyser = () => {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={currentStock.chart_data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
+                        tickFormatter={(d) => d.slice(0, 7)}
+                        interval={Math.max(Math.floor(currentStock.chart_data.length / 8) - 1, 0)} />
+                      <YAxis fontSize={11} tick={{ fill: "#94a3b8" }} />
                       <Tooltip />
-                      <Legend />
-                      <Bar dataKey="macd_histogram" fill="#e0e7ff" name="Histogram" barSize={4} />
-                      <Line type="monotone" dataKey="macd_signal" stroke="#f43f5e" name="Signal" dot={false} strokeWidth={2} />
-                      <Line type="monotone" dataKey="macd_line" stroke="#10b981" name="MACD" dot={false} strokeWidth={2} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="macd_histogram" name="Histogram" barSize={4}>
+                        {currentStock.chart_data.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={(entry.macd_histogram ?? 0) >= 0 ? "#10b981" : "#ef4444"} fillOpacity={0.7} />
+                        ))}
+                      </Bar>
+                      <Line type="monotone" dataKey="macd_signal" stroke="#f43f5e" name="Signal Line" dot={false} strokeWidth={2} strokeDasharray="4 2" />
+                      <Line type="monotone" dataKey="macd_line" stroke="#2563eb" name="MACD Line" dot={false} strokeWidth={2} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -800,15 +840,17 @@ export const Analyser = () => {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={currentStock.chart_data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
+                        tickFormatter={(d) => d.slice(0, 7)}
+                        interval={Math.max(Math.floor(currentStock.chart_data.length / 8) - 1, 0)} />
+                      <YAxis fontSize={11} tick={{ fill: "#94a3b8" }} tickFormatter={(v) => `₹${v.toFixed(0)}`} width={70} />
                       <Tooltip formatter={(val) => `₹${(val as number).toFixed(2)}`} />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line type="monotone" dataKey="bb_upper" stroke="#f97316" name="Upper Band" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
+                      <Line type="monotone" dataKey="bb_mid" stroke="#64748b" name="Middle Band" dot={false} strokeWidth={1} strokeDasharray="3 3" />
+                      <Line type="monotone" dataKey="bb_lower" stroke="#22c55e" name="Lower Band" dot={false} strokeWidth={1.5} strokeDasharray="5 5" />
                       <Line type="monotone" dataKey="close" stroke="#2563eb" name="Price" dot={false} strokeWidth={2} />
-                      <Line type="monotone" dataKey="bb_upper" stroke="#94a3b8" name="Upper Band" dot={false} strokeWidth={1} strokeDasharray="5 5" />
-                      <Line type="monotone" dataKey="bb_mid" stroke="#94a3b8" name="Middle Band" dot={false} strokeWidth={1} strokeDasharray="5 5" />
-                      <Line type="monotone" dataKey="bb_lower" stroke="#94a3b8" name="Lower Band" dot={false} strokeWidth={1} strokeDasharray="5 5" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -822,19 +864,19 @@ export const Analyser = () => {
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={currentStock.score_history}>
-                        <CartesianGrid strokeDasharray="3 3" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis dataKey="date" fontSize={11} tick={{ fill: "#94a3b8" }}
-                          tickFormatter={(d) => d.slice(0, 7)} interval={Math.floor(currentStock.score_history.length / 8)} />
-                        <YAxis yAxisId="price" orientation="left" fontSize={11} />
-                        <YAxis yAxisId="score" orientation="right" domain={[0, 100]} fontSize={11} />
+                          tickFormatter={(d) => d.slice(0, 7)} interval={Math.max(Math.floor(currentStock.score_history.length / 8) - 1, 0)} />
+                        <YAxis yAxisId="price" orientation="left" fontSize={11} tick={{ fill: "#94a3b8" }} tickFormatter={(v) => `₹${v.toFixed(0)}`} width={70} />
+                        <YAxis yAxisId="score" orientation="right" domain={[0, 100]} fontSize={11} tick={{ fill: "#94a3b8" }} />
                         <Tooltip
                           formatter={(val, name) =>
                             name === "Score" ? (val as number).toFixed(1) : `₹${(val as number).toFixed(2)}`
                           }
                         />
-                        <Legend />
-                        <Line yAxisId="price" type="monotone" dataKey="close" stroke="#2563eb" name="Price" dot={false} strokeWidth={1.5} />
-                        <Area yAxisId="score" type="monotone" dataKey="score" stroke="#8b5cf6" fill="#8b5cf633" name="Score" dot={false} strokeWidth={1.5} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Line yAxisId="price" type="monotone" dataKey="close" stroke="#2563eb" name="Price" dot={false} strokeWidth={2} />
+                        <Area yAxisId="score" type="monotone" dataKey="score" stroke="#8b5cf6" fill="#8b5cf633" name="Score" dot={false} strokeWidth={2} />
                         <ReferenceLine yAxisId="score" y={65} stroke="#16a34a" strokeDasharray="5 5"
                           label={{ value: "Buy zone", fontSize: 10, fill: "#16a34a", position: "right" }} />
                         <ReferenceLine yAxisId="score" y={35} stroke="#ef4444" strokeDasharray="5 5"
