@@ -11,7 +11,11 @@
       "Bash(npm run:*)",
       "Bash(curl -s http://localhost:8000/api/stock/RELIANCE.NS)",
       "Bash(curl -s http://localhost:8000/api/screen)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cd:*)",
+      "Bash(kill 12190)",
+      "Bash(python -c \"import main\")",
+      "Bash(npm list:*)"
     ]
   }
 }

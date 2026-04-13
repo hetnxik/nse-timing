@@ -1,0 +1,34 @@
+[
+  {
+    "id": "b20174bc-ee52-4f9e-bd95-b07bbc8a2e38",
+    "ticker": "COALINDIA.NS",
+    "entry_price": 434.1,
+    "entry_date": "2026-04-10",
+    "quantity": 33,
+    "stop_loss": 403.85,
+    "target": 472.91,
+    "notes": "MDC auto-trade. Signals: Above 200-DMA; Score 100 \u2265 65; RSI 39.7 in 25-55 range; 6M momentum +17.4%; 52W high ratio 0.91 > 0.65; %B -0.02 < 0.55 (lower band dip)",
+    "entry_score": 100.0,
+    "status": "open",
+    "exit_price": null,
+    "exit_date": null,
+    "exit_reason": null,
+    "auto": true
+  },
+  {
+    "id": "34fef4d1-be48-4508-ad55-bd64e157a372",
+    "ticker": "TORNTPHARM.NS",
+    "entry_price": 4155.2,
+    "entry_date": "2026-04-10",
+    "quantity": 3,
+    "stop_loss": 3912.29,
+    "target": 4484.58,
+    "notes": "MDC auto-trade. Signals: Above 200-DMA; Score 87 \u2265 65; RSI 41.6 in 25-55 range; 6M momentum +18.3%; 52W high ratio 0.93 > 0.65; %B 0.39 < 0.55 (lower band dip)",
+    "entry_score": 87.0,
+    "status": "open",
+    "exit_price": null,
+    "exit_date": null,
+    "exit_reason": null,
+    "auto": true
+  }
+]

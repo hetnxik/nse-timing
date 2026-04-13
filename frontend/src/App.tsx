@@ -5,6 +5,8 @@ import { Screener } from "./pages/Screener";
 import { Compare } from "./pages/Compare";
 import { Heatmap } from "./pages/Heatmap";
 import { Education } from "./pages/Education";
+import { PaperTrades } from "./pages/PaperTrades";
+import { Replay } from "./pages/Replay";
 
 export function App() {
   const [dark, setDark] = useState(() => {
@@ -58,6 +60,18 @@ export function App() {
                 >
                   Education
                 </Link>
+                <Link
+                  to="/paper-trades"
+                  className="text-sm hover:text-blue-600 transition-colors"
+                >
+                  Paper Trades
+                </Link>
+                <Link
+                  to="/replay"
+                  className="text-sm hover:text-blue-600 transition-colors"
+                >
+                  Replay
+                </Link>
               </div>
             </div>
             <button
@@ -77,6 +91,8 @@ export function App() {
             <Route path="/compare" element={<Compare />} />
             <Route path="/heatmap" element={<Heatmap />} />
             <Route path="/education" element={<Education />} />
+            <Route path="/paper-trades" element={<PaperTrades />} />
+            <Route path="/replay" element={<Replay />} />
           </Routes>
         </main>
       </div>

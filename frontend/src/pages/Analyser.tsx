@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useStore } from "../store";
-import { apiClient, BacktestResult, StockData } from "../api";
+import { apiClient, BacktestResult, StockData, TradeCreate } from "../api";
 import { ScoreGauge } from "../components/ScoreGauge";
 import { SignalCard } from "../components/SignalCard";
 import { IndicatorCard } from "../components/IndicatorCard";
@@ -134,10 +134,135 @@ function RrBadge({ quality }: { quality: "poor" | "acceptable" | "good" }) {
   return <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{quality}</span>;
 }
 
+function PaperTradeModal({
+  stock,
+  onClose,
+}: {
+  stock: StockData;
+  onClose: () => void;
+}) {
+  const ez = stock.entry_zone;
+  const today = new Date().toISOString().slice(0, 10);
+  const [entryPrice, setEntryPrice] = useState(String(stock.meta.current_price.toFixed(2)));
+  const [quantity, setQuantity] = useState("1");
+  const [stopLoss, setStopLoss] = useState(String(ez.stop_atr.toFixed(2)));
+  const [target, setTarget] = useState(String(ez.target_bb_upper.toFixed(2)));
+  const [entryDate, setEntryDate] = useState(today);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleSubmit() {
+    setSaving(true);
+    const trade: TradeCreate = {
+      ticker: stock.meta.ticker,
+      entry_price: parseFloat(entryPrice),
+      entry_date: entryDate,
+      quantity: parseFloat(quantity),
+      stop_loss: parseFloat(stopLoss) || null,
+      target: parseFloat(target) || null,
+      notes: notes || null,
+      entry_score: stock.score.value,
+    };
+    await apiClient.createTrade(trade);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(onClose, 800);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-96 shadow-xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <h3 className="font-semibold text-lg mb-1">Paper Trade</h3>
+        <p className="text-xs text-slate-500 mb-4">{stock.meta.ticker} — Score {stock.score.value.toFixed(0)} ({stock.score.verdict})</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Entry Price (₹)</label>
+              <input
+                type="number"
+                value={entryPrice}
+                onChange={(e) => setEntryPrice(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Quantity (shares)</label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Stop Loss (₹)</label>
+              <input
+                type="number"
+                value={stopLoss}
+                onChange={(e) => setStopLoss(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Target (₹)</label>
+              <input
+                type="number"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Entry Date</label>
+            <input
+              type="date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+              className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Thesis, catalyst, etc."
+              className="w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-800 resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || saved}
+            className={`flex-1 py-2 rounded text-sm font-semibold text-white transition-colors ${
+              saved ? "bg-green-600" : saving ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {saved ? "Saved!" : saving ? "Saving…" : "Log Trade"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EntryZoneTab({ stock }: { stock: StockData }) {
   const ez = stock.entry_zone;
   const [stopBasis, setStopBasis] = useState<"atr" | "bb">("atr");
   const [targetBasis, setTargetBasis] = useState<"bb_upper" | "52w_high" | "momentum">("bb_upper");
+  const [showTradeModal, setShowTradeModal] = useState(false);
 
   const stop = stopBasis === "atr" ? ez.stop_atr : ez.stop_bb;
   const stopPct = stopBasis === "atr" ? ez.stop_atr_pct : ez.stop_bb_pct;
@@ -260,6 +385,20 @@ function EntryZoneTab({ stock }: { stock: StockData }) {
       <div className="card text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
         {getEntryZoneExplanation(stopBasis, stop, stopPct, targetBasis, targetVal, targetLabel, rrData.rr, posSize)}
       </div>
+
+      {/* Paper Trade CTA */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowTradeModal(true)}
+          className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
+        >
+          Paper Trade
+        </button>
+      </div>
+
+      {showTradeModal && (
+        <PaperTradeModal stock={stock} onClose={() => setShowTradeModal(false)} />
+      )}
     </div>
   );
 }
